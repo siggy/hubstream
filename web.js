@@ -1,51 +1,39 @@
-// web.js
-var Redis   = require('redis'),
-    express = require("express"),
-    logfmt  = require("logfmt");
-
-var EVENT_QUEUE  = 'event_queue';
-
-var redisClient = Redis.createClient();
-redisClient.on('error', function (err) {
+var redis = require('redis').createClient();
+redis.on('error', function (err) {
   console.log('Error ' + err);
 });
+var clients = [];
 
-redisClient.on("message", function (channel, message) {
-  console.log("redisClient message " + channel + ": " + message);
-
-  event = JSON.parse(message);
-  console.log(event);
+var EVENT_QUEUE  = 'event_queue';
+redis.on("message", function (channel, message) {
+  clients.forEach(function(client) {
+    client.send(message, function() {});
+  });
 });
+redis.subscribe(EVENT_QUEUE);
 
-redisClient.subscribe(EVENT_QUEUE);
-
-
-// dump all users
-// redisClient.hgetall(USER_CACHE, function (err, obj) {
-//   Object.keys(obj).forEach(function(id) {
-//     console.log(id);
-//     console.log(obj[id]);
-//   });
-// });
-
-// dump all geos
-// redisClient.hgetall(GEO_CACHE, function (err, obj) {
-//   Object.keys(obj).forEach(function(id) {
-//     console.log(id);
-//     console.log(obj[id]);
-//   });
-// });
-
-
+var WebSocketServer = require("ws").Server;
+var http = require("http");
+var express = require("express");
 var app = express();
+var port = process.env.PORT || 5000;
 
-app.use(logfmt.requestLogger());
+app.use(express.static(__dirname + "/"));
 
-app.get('/', function(req, res) {
-  res.send('Hello World!');
-});
+var server = http.createServer(app);
+server.listen(port);
 
-var port = Number(process.env.PORT || 5000);
-app.listen(port, function() {
-  console.log("Listening on " + port);
+console.log("http server listening on %d", port);
+
+var wss = new WebSocketServer({server: server});
+console.log("websocket server created");
+
+wss.on("connection", function(ws) {
+  console.log("websocket connection open");
+  clients.push(ws);
+
+  ws.on("close", function() {
+    console.log("websocket connection close");
+    clients.splice(clients.indexOf(ws), 1);
+  });
 });

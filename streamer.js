@@ -1,14 +1,12 @@
-// streamer.js
 var GitHub      = require('github'),
     Redis       = require('redis'),
-    geocoder    = require('geocoder'),
-    credentials = require('./credentials.json');
+    geocoder    = require('geocoder');
 
 var EVENT_QUEUE  = 'event_queue';
 var USER_CACHE   = 'user_cache';
 var GEO_CACHE    = 'geo_cache';
 
-var GITHUB_MIN_LIMIT = 4200;
+var GITHUB_MIN_LIMIT = 4000;
 
 var maxEventId = 0;
 
@@ -42,8 +40,8 @@ var github = new GitHub({
 
 github.authenticate({
   type: "oauth",
-  key: credentials.github_oauth_key,
-  secret: credentials.github_oauth_secret
+  key: process.env.HUBSTREAM_GITHUB_KEY,
+  secret: process.env.HUBSTREAM_GITHUB_SECRET
 });
 
 var backoff = 1000;
@@ -98,13 +96,13 @@ function getUser(actor, callback) {
 
       console.log('x-ratelimit-remaining: ' + user.meta['x-ratelimit-remaining']);
       if (parseInt(user.meta['x-ratelimit-remaining']) < GITHUB_MIN_LIMIT) {
-        clearInterval(poll);
+        clearInterval(global.poll);
       }
     });
   });
 }
 
-var poll = setInterval(function() {
+global.poll = setInterval(function() {
   github.events.get({}, function(err, events) {
     sortedEvents = events.sort(function (a,b) {
       return parseInt(a.id) - parseInt(b.id);
@@ -127,7 +125,6 @@ var poll = setInterval(function() {
           console.log('location: ' + user.location);
           console.log('geo: ' + JSON.stringify(geoData.results[0].geometry.location));
 
-
           redis.publish(EVENT_QUEUE, JSON.stringify({
             event: event,
             user: user,
@@ -139,9 +136,26 @@ var poll = setInterval(function() {
 
     console.log('x-ratelimit-remaining: ' + events.meta['x-ratelimit-remaining']);
     if (parseInt(events.meta['x-ratelimit-remaining']) < GITHUB_MIN_LIMIT) {
-      clearInterval(poll);
+      clearInterval(global.poll);
     }
   });
 
   console.log(stats);
 }, 1000);
+
+
+// dump all users
+// redisClient.hgetall(USER_CACHE, function (err, obj) {
+//   Object.keys(obj).forEach(function(id) {
+//     console.log(id);
+//     console.log(obj[id]);
+//   });
+// });
+
+// dump all geos
+// redisClient.hgetall(GEO_CACHE, function (err, obj) {
+//   Object.keys(obj).forEach(function(id) {
+//     console.log(id);
+//     console.log(obj[id]);
+//   });
+// });
