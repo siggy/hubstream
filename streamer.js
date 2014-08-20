@@ -6,7 +6,7 @@ var EVENT_QUEUE  = 'event_queue';
 var USER_CACHE   = 'user_cache';
 var GEO_CACHE    = 'geo_cache';
 
-var GITHUB_MIN_LIMIT = 4000;
+var GITHUB_MIN_LIMIT = 2900;
 
 var maxEventId = 0;
 
@@ -52,7 +52,7 @@ function geocode(userLocation, callback) {
   }
   stats.locations++;
   redis.hget(GEO_CACHE, userLocation, function (err, json) {
-    if (json != null) {
+    if (json) {
       stats.geoCacheHits++;
       return callback(0, JSON.parse(json));
     }
@@ -65,6 +65,11 @@ function geocode(userLocation, callback) {
     }
 
     geocoder.geocode(userLocation, function (err, data) {
+      if (err) {
+        console.log('geocode.geocode error: ' + err);
+        return;
+      }
+
       if (data.status == "OVER_QUERY_LIMIT") {
         stats.geoQueryLimitSkips++;
         console.log("geocode: sleeping for " + backoff / 1000 + " seconds");
@@ -83,27 +88,38 @@ function geocode(userLocation, callback) {
 
 function getUser(actor, callback) {
   redis.hget(USER_CACHE, actor.id, function (err, json) {
-    if (json != null) {
+    if (json) {
       stats.userCacheHits++;
       return callback(0, JSON.parse(json));
+    } else if (err) {
+      console.log('redis.hget error: ' + err);
     }
 
     stats.userCacheMisses++;
 
     github.user.getFrom({user: actor.login}, function (err, user) {
-      redis.hset(USER_CACHE, user.id, JSON.stringify(user));
-      callback(0, user);
+      if (user) {
+        redis.hset(USER_CACHE, user.id, JSON.stringify(user));
+        callback(0, user);
 
-      console.log('x-ratelimit-remaining: ' + user.meta['x-ratelimit-remaining']);
-      if (parseInt(user.meta['x-ratelimit-remaining']) < GITHUB_MIN_LIMIT) {
-        clearInterval(global.poll);
+        console.log('x-ratelimit-remaining: ' + user.meta['x-ratelimit-remaining']);
+        if (parseInt(user.meta['x-ratelimit-remaining']) < GITHUB_MIN_LIMIT) {
+          clearInterval(global.poll);
+        }
+      } else if (err) {
+        console.log('github.user.getFrom error: ' + err);
       }
     });
   });
 }
 
 global.poll = setInterval(function() {
-  github.events.get({}, function(err, events) {
+  github.events.get({}, function (err, events) {
+    if (err) {
+      console.log('github.events.get error: ' + err);
+      return;
+    }
+
     sortedEvents = events.sort(function (a,b) {
       return parseInt(a.id) - parseInt(b.id);
     });
@@ -118,8 +134,18 @@ global.poll = setInterval(function() {
       stats.events++;
       console.log('event: ' + event.id);
 
-      getUser(event.actor, function(err, user) {
+      getUser(event.actor, function (err, user) {
+        if (err) {
+          console.log('getUser error: ' + err);
+          return;
+        }
+
         geocode(user.location, function (err, geoData) {
+          if (err) {
+            console.log('geocode error: ' + err);
+            return;
+          }
+
           console.log('event: ' + event.id);
           console.log('user: ' + user.login);
           console.log('location: ' + user.location);
