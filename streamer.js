@@ -6,7 +6,7 @@ var EVENT_QUEUE  = 'event_queue';
 var USER_CACHE   = 'user_cache';
 var GEO_CACHE    = 'geo_cache';
 
-var GITHUB_MIN_LIMIT = 2900;
+var GITHUB_MIN_LIMIT = 4000;
 
 var maxEventId = 0;
 
