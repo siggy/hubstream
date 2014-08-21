@@ -26,15 +26,18 @@ var stats = {
 var redisHost = '127.0.0.1';
 var redisPort = 6379;
 var redisPass = '';
-
+console.log("yo1");
 if (process.env.REDISTOGO_URL) {
   // redis://username:password@host:port/
   var rtg   = require("url").parse(process.env.REDISTOGO_URL);
-
+console.log("yo2");
+console.log(rtg);
   redisHost = rtg.hostname;
   redisPort = rtg.port;
   redisPass = rtg.auth.split(":")[1];
+console.log(redisHost);
 }
+console.log("yo3");
 
 var redis = require("redis").createClient(redisPort, redisHost);
 redis.auth(redisPass);
