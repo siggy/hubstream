@@ -43,7 +43,7 @@ var redis = require("redis").createClient(redisPort, redisHost);
 redis.auth(redisPass);
 
 redis.on('error', function (err) {
-  console.log('Error ' + err);
+  console.log('streamer.js Redis Error: ' + err);
 });
 
 var github = new GitHub({
