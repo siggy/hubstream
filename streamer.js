@@ -8,7 +8,7 @@ var USER_CACHE   = 'user_cache';
 var GEO_CACHE    = 'geo_cache';
 
 var GITHUB_MIN_REMAINING = 2000;
-var GITHUB_MAX_EVENT_DELAY_MS = 10000
+var GITHUB_MAX_EVENT_DELAY_MS = 10000;
 
 var maxEventId = 0;
 
@@ -87,7 +87,7 @@ function geocode(userLocation, callback) {
     });
 
   });
-}
+};
 
 function getUserFromGithub(login, callback) {
   github.user.getFrom({user: login}, function (err, user) {
@@ -119,7 +119,7 @@ function getUser(actor, callback) {
       stats.eventsDropped++;
     }
   });
-}
+};
 
 var githubTimer = 1000;
 var checkGithubLimit = function () {
@@ -147,7 +147,7 @@ var checkGithubLimit = function () {
 
     setTimeout(checkGithubLimit, githubTimer);
   });
-}
+};
 setTimeout(checkGithubLimit, githubTimer);
 
 var getEvents = function () {
@@ -185,13 +185,6 @@ var getEvents = function () {
       console.log(stats);
 
       newEvents.forEach(function(event) {
-        // throttle event queries based on time / calls remaining
-        var remaining = parseInt(events.meta['x-ratelimit-remaining']) - GITHUB_MIN_REMAINING;
-        if (remaining < 0) { remaining = 0; };
-        var reset     = parseInt(events.meta['x-ratelimit-reset'])*1000 - (new Date().getTime());
-
-        stats.eventTimer = Math.ceil(reset / remaining)*2;
-
         getUser(event.actor, function (err, user) {
           if (err) {
             console.log('getUser error: ' + err);
@@ -215,5 +208,5 @@ var getEvents = function () {
     }
     setTimeout(getEvents, stats.eventsTimer);
   });
-}
+};
 setTimeout(getEvents, stats.eventsTimer);
