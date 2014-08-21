@@ -1,8 +1,9 @@
 var GitHub      = require('github'),
-    Redis       = require('redis'),
-    geocoder    = require('geocoder');
+    geocoder    = require('geocoder'),
+    Redis       = require('./redis');
 
-var EVENT_QUEUE  = 'event_queue';
+redis = Redis.createClient();
+
 var USER_CACHE   = 'user_cache';
 var GEO_CACHE    = 'geo_cache';
 
@@ -23,37 +24,18 @@ var stats = {
   geoCacheMisses: 0
 };
 
-var redisHost = '127.0.0.1';
-var redisPort = 6379;
-var redisPass = '';
-
-if (process.env.REDISTOGO_URL) {
-  // redis://username:password@host:port/
-  var rtg   = require("url").parse(process.env.REDISTOGO_URL);
-  redisHost = rtg.hostname;
-  redisPort = rtg.port;
-  redisPass = rtg.auth.split(":")[1];
-}
-
-var redis = require("redis").createClient(redisPort, redisHost);
-redis.auth(redisPass);
-
-redis.on('error', function (err) {
-  console.log('streamer.js Redis Error: ' + err);
-});
-
 var github = new GitHub({
   // required
-  version: "3.0.0",
+  version: '3.0.0',
   // optional
   // debug: true,
-  protocol: "https",
-  // host: "sig.gy",
+  protocol: 'https',
+  // host: 'sig.gy',
   timeout: 5000
 });
 
 github.authenticate({
-  type: "oauth",
+  type: 'oauth',
   key: process.env.HUBSTREAM_GITHUB_KEY,
   secret: process.env.HUBSTREAM_GITHUB_SECRET
 });
@@ -84,12 +66,12 @@ function geocode(userLocation, callback) {
         return;
       }
 
-      if (data.status == "OVER_QUERY_LIMIT") {
+      if (data.status == 'OVER_QUERY_LIMIT') {
         stats.geoQueryLimitSkips++;
-        console.log("geocode: sleeping for " + backoff / 1000 + " seconds");
+        console.log('geocode: sleeping for ' + backoff / 1000 + ' seconds');
         nextTry = new Date().getTime() + backoff;
         backoff *= 2;
-      } else if (data.status == "OK") {
+      } else if (data.status == 'OK') {
         redis.hset(GEO_CACHE, userLocation, JSON.stringify(data));
         backoff = 1000;
         nextTry = 0;
@@ -165,7 +147,7 @@ global.poll = setInterval(function() {
           console.log('location: ' + user.location);
           console.log('geo: ' + JSON.stringify(geoData.results[0].geometry.location));
 
-          redis.publish(EVENT_QUEUE, JSON.stringify({
+          redis.publish(Redis.EVENT_QUEUE, JSON.stringify({
             event: event,
             user: user,
             geo: geoData.results[0].geometry.location

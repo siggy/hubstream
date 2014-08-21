@@ -12,5 +12,6 @@ Deploy
 
     heroku create
     heroku addons:add redistogo
+    heroku addons:upgrade redistogo:mini
     git push heroku master
     heroku open

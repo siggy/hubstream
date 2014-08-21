@@ -5,7 +5,7 @@
     "type": "git",
     "url": "https://github.com/siggy/hubstream.git"
   },
-  "description": "github events on a google map",
+  "description": "streaming github events on a google map",
   "main": "web.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
