@@ -7,7 +7,7 @@ redis = Redis.createClient();
 var USER_CACHE   = 'user_cache';
 var GEO_CACHE    = 'geo_cache';
 
-var GITHUB_LIMIT = 4700;
+var GITHUB_MIN = 4700;
 var githubRemaining = 0;
 
 var maxEventId = 0;
@@ -104,7 +104,8 @@ function getUser(actor, callback) {
   });
 }
 
-setInterval(function() {
+var githubBackoff = 1000;
+var checkGithubLimit = function () {
   github.misc.rateLimit({}, function(err, limits) {
     if (err) {
       console.log('github.misc.rateLimit error: ' + err);
@@ -113,19 +114,24 @@ setInterval(function() {
     }
 
     githubRemaining = limits.resources.core.remaining;
-    // if (stats.events % 0 == 0) {
-      console.log('github api calls remaining: ' + githubRemaining);
-    // }
+    console.log('github api calls remaining: ' + githubRemaining);
 
-    if (githubRemaining < GITHUB_LIMIT) {
+    if (githubRemaining < GITHUB_MIN) {
       stats.githubOverLimit++;
+      githubBackoff *= 2;
       console.log('github over limit: ' + githubRemaining + ' remaining');
+      console.log('github backoff increased to: ' + githubBackoff + 'ms');
+    } else {
+      githubBackoff = 1000;
     }
+
+    setTimeout(checkGithubLimit, githubBackoff);
   });
-}, 1000);
+}
+setTimeout(checkGithubLimit, githubBackoff);
 
 setInterval(function() {
-  if (githubRemaining < GITHUB_LIMIT) {
+  if (githubRemaining < GITHUB_MIN) {
     stats.githubLimitSkips++;
     return;
   }
@@ -148,7 +154,6 @@ setInterval(function() {
       maxEventId = parseInt(event.id);
 
       stats.events++;
-      // console.log('event: ' + event.id);
       if (stats.events % 10 == 0) {
         console.log(stats);
       }
@@ -164,11 +169,6 @@ setInterval(function() {
             console.log('geocode error: ' + err);
             return;
           }
-
-          // console.log('event: ' + event.id);
-          // console.log('user: ' + user.login);
-          // console.log('location: ' + user.location);
-          // console.log('geo: ' + JSON.stringify(geoData.results[0].geometry.location));
 
           redis.publish(Redis.EVENT_QUEUE, JSON.stringify({
             event: event,
