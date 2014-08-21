@@ -1,3 +1,5 @@
+require('newrelic');
+
 var GitHub      = require('github'),
     geocoder    = require('geocoder'),
     Redis       = require('./redis');
