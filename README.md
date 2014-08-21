@@ -1,12 +1,16 @@
 Hubstream
 ===========
 
-Streaming Github events on a map
+Streaming Github events on a Google Map
 
-Setup
+Local
 
     npm install
-
-Boot
-
     foreman start
+
+Deploy
+
+    heroku create
+    heroku addons:add redistogo
+    git push heroku master
+    heroku open
