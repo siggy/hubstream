@@ -7,8 +7,8 @@ redis = Redis.createClient();
 var USER_CACHE   = 'user_cache';
 var GEO_CACHE    = 'geo_cache';
 
-var GITHUB_MIN_REMAINING = 2000;
-var GITHUB_MAX_EVENT_DELAY_MS = 10000;
+var GITHUB_MIN_REMAINING = 1000;
+var GITHUB_MAX_EVENT_DELAY_MS = 5000;
 
 var maxEventId = 0;
 
@@ -174,16 +174,17 @@ var getEvents = function () {
       if (events.length == newEvents.length) {
         // we may have missed events, cut timer in half
         stats.eventsTimer = Math.floor(stats.eventsTimer / 2);
-      } else if ((events.length / newEvents.length) > 1.5) {
-        // 33% duplicate events, bump timer up a bit
-        stats.eventsTimer = Math.floor(stats.eventsTimer * 1.1);
+      } else if ((events.length / newEvents.length) > 1.2) {
+        // 5 duplicates out of 30 events, bump timer up a bit
+        stats.eventsTimer = Math.min(Math.floor(stats.eventsTimer * 1.1), GITHUB_MAX_EVENT_DELAY_MS);
       }
 
       stats.events += events.length;
       stats.eventsUnique += newEvents.length;
       console.log(stats);
 
-      newEvents.forEach(function(event) {
+      newEvents.forEach(function(event, i) {
+
         getUser(event.actor, function (err, user) {
           if (err) {
             console.log('getUser error: ' + err);
@@ -196,11 +197,19 @@ var getEvents = function () {
               return;
             }
 
-            redis.publish(Redis.EVENT_QUEUE, JSON.stringify({
-              event: event,
-              user: user,
-              geo: geoData.results[0].geometry.location
-            }));
+            var timeout = 0;
+            if (i) {
+              // for that more organic feel
+              timeout = Math.abs(Date.parse(event.created_at) - Date.parse(newEvents[i-1].created_at));
+            }
+
+            setTimeout(function() {
+              redis.publish(Redis.EVENT_QUEUE, JSON.stringify({
+                event: event,
+                user: user,
+                geo: geoData.results[0].geometry.location
+              }));
+            }, timeout);
           });
         });
       });
