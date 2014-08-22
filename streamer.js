@@ -1,5 +1,3 @@
-require('newrelic');
-
 var GitHub      = require('github'),
     geocoder    = require('geocoder'),
     Redis       = require('./redis');
@@ -16,25 +14,24 @@ var maxEventId = 0;
 
 var stats = {
   events: 0,
-  uniqueEvents: 0,
-  locations: 0,
-
-  githubLimitSkips: 0,
-  githubOverLimit: 0,
-  userCacheHits: 0,
-  userCacheMisses: 0,
+  eventsUnique: 0,
   eventsDropped: 0,
-
-  geoLimitSkips: 0,
-  geoOverLimit: 0,
-  geoCacheHits: 0,
-  geoCacheMisses: 0,
 
   eventTimer: 1000,
   eventsTimer: 1000,
 
   githubRemaining: 0,
-  githubReset: 0
+  githubReset: 0,
+  githubLimitSkips: 0,
+  githubOverLimit: 0,
+  githubCacheHits: 0,
+  githubCacheMisses: 0,
+
+  geoLocations: 0,
+  geoLimitSkips: 0,
+  geoOverLimit: 0,
+  geoCacheHits: 0,
+  geoCacheMisses: 0
 };
 
 var github = new GitHub({
@@ -55,7 +52,7 @@ function geocode(userLocation, callback) {
   if (!userLocation) {
     return;
   }
-  stats.locations++;
+  stats.geoLocations++;
   redis.hget(GEO_CACHE, userLocation, function (err, json) {
     if (json) {
       stats.geoCacheHits++;
@@ -105,13 +102,13 @@ function getUserFromGithub(login, callback) {
 function getUser(actor, callback) {
   redis.hget(USER_CACHE, actor.id, function (err, json) {
     if (json) {
-      stats.userCacheHits++;
+      stats.githubCacheHits++;
       return callback(0, JSON.parse(json));
     } else if (err) {
       console.log('redis.hget error: ' + err);
     }
 
-    stats.userCacheMisses++;
+    stats.githubCacheMisses++;
 
     // throttle event queries based on time / calls remaining
     stats.eventTimer = Math.ceil(stats.githubReset / stats.githubRemaining)*2;
@@ -183,7 +180,7 @@ var getEvents = function () {
       }
 
       stats.events += events.length;
-      stats.uniqueEvents += newEvents.length;
+      stats.eventsUnique += newEvents.length;
       console.log(stats);
 
       newEvents.forEach(function(event) {
