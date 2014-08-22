@@ -35,7 +35,8 @@ a {
   font-size: 26px;
 }
 .github {
-  position: absolute; bottom: 0;
+  position: absolute;
+  bottom: 0;
 }
 .favicon {
   vertical-align: middle;
