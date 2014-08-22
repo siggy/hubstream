@@ -120,6 +120,28 @@ function getUser(actor, callback) {
   });
 };
 
+function dispatchEvent(event) {
+  getUser(event.actor, function (err, user) {
+    if (err) {
+      console.log('getUser error: ' + err);
+      return;
+    }
+
+    geocode(user.location, function (err, geoData) {
+      if (err) {
+        console.log('geocode error: ' + err);
+        return;
+      }
+
+      redis.publish(Redis.EVENT_QUEUE, JSON.stringify({
+        event: event,
+        user: user,
+        geo: geoData.results[0].geometry.location
+      }));
+    });
+  });
+};
+
 var githubTimer = 1000;
 var checkGithubLimit = function () {
   github.misc.rateLimit({}, function(err, limits) {
@@ -147,7 +169,7 @@ var checkGithubLimit = function () {
     setTimeout(checkGithubLimit, githubTimer);
   });
 };
-setTimeout(checkGithubLimit, githubTimer);
+checkGithubLimit();
 
 var getEvents = function () {
   if (!stats.githubRemaining) {
@@ -159,62 +181,41 @@ var getEvents = function () {
   github.events.get({}, function (err, events) {
     if (err) {
       console.log('github.events.get error: ' + err);
-    } else {
-      // filter out duplicate events
-      var newEvents = events.filter(function (event) {
-        return (parseInt(event.id) > maxEventId);
-      }).sort(function (a,b) {
-        return parseInt(a.id) - parseInt(b.id);
-      });
-      if (newEvents.length) {
-        maxEventId = parseInt(newEvents[newEvents.length - 1].id);
-      }
-
-      // throttle events queries just enough to not miss any
-      if (events.length == newEvents.length) {
-        // we may have missed events, cut timer in half
-        stats.eventsTimer = Math.floor(stats.eventsTimer / 2);
-      } else if ((events.length / newEvents.length) > 1.2) {
-        // 5 duplicates out of 30 events, bump timer up a bit
-        stats.eventsTimer = Math.min(Math.floor(stats.eventsTimer * 1.1), GITHUB_MAX_EVENT_DELAY_MS);
-      }
-
-      stats.events += events.length;
-      stats.eventsUnique += newEvents.length;
-      console.log(stats);
-
-      newEvents.forEach(function(event, i) {
-
-        getUser(event.actor, function (err, user) {
-          if (err) {
-            console.log('getUser error: ' + err);
-            return;
-          }
-
-          geocode(user.location, function (err, geoData) {
-            if (err) {
-              console.log('geocode error: ' + err);
-              return;
-            }
-
-            var timeout = 0;
-            if (i) {
-              // for that more organic feel
-              timeout = Math.abs(Date.parse(event.created_at) - Date.parse(newEvents[i-1].created_at));
-            }
-
-            setTimeout(function() {
-              redis.publish(Redis.EVENT_QUEUE, JSON.stringify({
-                event: event,
-                user: user,
-                geo: geoData.results[0].geometry.location
-              }));
-            }, timeout);
-          });
-        });
-      });
+      return;
     }
+
+    // filter out duplicate events
+    var newEvents = events.filter(function (event) {
+      return (parseInt(event.id) > maxEventId);
+    }).sort(function (a,b) {
+      return parseInt(a.id) - parseInt(b.id);
+    });
+    if (newEvents.length) {
+      maxEventId = parseInt(newEvents[newEvents.length - 1].id);
+    }
+
+    // throttle events queries just enough to not miss any
+    if (events.length == newEvents.length) {
+      // we may have missed events, cut timer in half
+      stats.eventsTimer = Math.floor(stats.eventsTimer / 2);
+    } else if ((events.length / newEvents.length) > 1.2) {
+      // 5 duplicates out of 30 events, bump timer up a bit
+      stats.eventsTimer = Math.min(Math.floor(stats.eventsTimer * 1.1), GITHUB_MAX_EVENT_DELAY_MS);
+    }
+
+    stats.events += events.length;
+    stats.eventsUnique += newEvents.length;
+    console.log(stats);
+
+    newEvents.forEach(function(event, i) {
+      // for that more organic feel
+      timeout = i ? Math.abs(Date.parse(event.created_at) - Date.parse(newEvents[i-1].created_at)) : 0;
+      setTimeout(function () {
+        dispatchEvent(event);
+      }, timeout);
+    });
+
     setTimeout(getEvents, stats.eventsTimer);
   });
 };
-setTimeout(getEvents, stats.eventsTimer);
+getEvents();
