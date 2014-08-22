@@ -2,44 +2,13 @@
 <html>
   <head>
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
-    <style type="text/css">
-      html { height: 100% }
-      body { height: 100%; margin: 0; padding: 0 }
-      #map-canvas { height: 100% }
-    </style>
+    <link rel="stylesheet" type="text/css" href="hubstream.css">
 
     <script type="text/javascript"
       src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBSQMBZGgCVYCCu0Sdsy40enU7LNRScytw">
     </script>
 
     <script type="text/javascript">
-
-      var eventMap = {
-        'CommitCommentEvent': function(event) { return event['payload']['comment']['html_url']; },
-        'CreateEvent': function(event) { return event['repo']['url'].replace("api.", "").replace('/repos', ''); },
-        'DeleteEvent': function(event) { return event['repo']['url'].replace("api.", "").replace('/repos', ''); },
-        'DeploymentEvent': function(event) { return event['payload']['foo']['bar']; },
-        'DeploymentStatusEvent': function(event) { return event['payload']['foo']['bar']; },
-        'DownloadEvent': function(event) { return event['payload']['foo']['bar']; },
-        'FollowEvent': function(event) { return event['payload']['foo']['bar']; },
-        'ForkEvent': function(event) { return event['payload']['forkee']['html_url']; },
-        'ForkApplyEvent': function(event) { return event['payload']['foo']['bar']; },
-        'GistEvent': function(event) { return event['payload']['foo']['bar']; },
-        'GollumEvent': function(event) { return event['payload']['pages'][0]['html_url']; },
-        'IssueCommentEvent': function(event) { return event['payload']['comment']['html_url']; },
-        'IssuesEvent': function(event) { return event['payload']['issue']['html_url']; },
-        'MemberEvent': function(event) { return event['repo']['url'] + '/collaborators'; },
-        'PageBuildEvent': function(event) { return event['payload']['foo']['bar']; },
-        'PublicEvent': function(event) { return event['repo']['url'].replace("api.", "").replace('/repos', ''); },
-        'PullRequestEvent': function(event) { return event['payload']['pull_request']['html_url']; },
-        'PullRequestReviewCommentEvent': function(event) { return event['payload']['comment']['html_url']; },
-        'PushEvent': function(event) { return 'https://github.com/'+ event['repo']['name'] + '/commit/' + event['payload']['head']; },
-        'ReleaseEvent': function(event) { return event['payload']['release']['html_url']; },
-        'StatusEvent': function(event) { return event['payload']['foo']['bar']; },
-        'TeamAddEvent': function(event) { return event['repo']['url']['bar']; },
-        'WatchEvent': function(event) { return 'https://github.com/' + event['repo']['name'] + '/watchers'; },
-      };
-
       var map;
       function initialize() {
         var mapOptions = {
@@ -56,6 +25,9 @@
         processEvent(JSON.parse(message.data));
       };
 
+      var markers = [];
+      var infowindow = new google.maps.InfoWindow();
+
       function processEvent(data) {
         var marker = new google.maps.Marker({
           map: map,
@@ -70,21 +42,40 @@
           }
         });
 
-        var infowindow = new google.maps.InfoWindow({
-          content:
-            '<a target="_blank" href="' + data.user.html_url + '">' +
-              '<img src="' + data.user.avatar_url + '" height="48" width="48" alt="' + data.user.login + '" title="' + data.user.login + '">' +
-            '</a>' +
-            '<a target="_blank" href="' + data.user.html_url + '">' + data.user.login + '</a>' +
-            data.user.location +
-            '<a target="_blank" href="https://github.com/' + data.event.repo.name + '">' + data.event.repo.name + '</a>' +
-            '<a target="_blank" href="' + eventMap[data.event.type](data.event) + '">' + data.event.type + '</a>'
+        markers.push(marker);
+        if (markers.length > 1000) {
+          markers.shift().setMap(null);
+        }
 
-            // 'type: ' + data.event.type + '<br>' +
-            // 'payload: ' + payload + '<br>' +
-            // JSON.stringify(data.event)
-        });
         google.maps.event.addListener(marker, 'click', function() {
+          infowindow.setContent(
+            '<div class="infowindow">' +
+              '<a target="_blank" href="' + data.user.html_url + '">' +
+                '<img src="' + data.user.avatar_url + '" class="avatar" alt="' + data.user.login + '" title="' + data.user.login + '">' +
+              '</a>' +
+              '<div class="data">' +
+                '<ul>' +
+                  '<li class="username">' + data.user.name + '</li>' +
+                  '<li>' +
+                    data.user.location +
+                  '</li>' +
+                '</ul>' +
+                '<ul class="github">' +
+                  '<li>' +
+                    '<a target="_blank" href="' + data.user.html_url + '">' +
+                      '<img src="https://github.com/favicon.ico" class="favicon"></img>' +
+                    '</a>' +
+                  '</li>' +
+                  '<li>' +
+                    '<a target="_blank" href="' + data.user.html_url + '">' + data.user.login +'</a>' +
+                  '</li>' +
+                  '<li><a target="_blank" href="https://github.com/' + data.event.repo.name + '">' + data.event.repo.name + '</a></li>' +
+                  '<li><a target="_blank" href="' + data.event_url + '">' + data.event.type + '</a></li>' +
+                '</ul>' +
+              '</div>' +
+            '</div>'
+          );
+
           infowindow.open(map, marker);
         });
       }

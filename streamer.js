@@ -120,6 +120,32 @@ function getUser(actor, callback) {
   });
 };
 
+var eventMap = {
+  'CommitCommentEvent': function(event) { return event['payload']['comment']['html_url']; },
+  'CreateEvent': function(event) { return event['repo']['url'].replace("api.", "").replace('/repos', ''); },
+  'DeleteEvent': function(event) { return event['repo']['url'].replace("api.", "").replace('/repos', ''); },
+  'DeploymentEvent': function(event) { return event['payload']['foo']['bar']; },
+  'DeploymentStatusEvent': function(event) { return event['payload']['foo']['bar']; },
+  'DownloadEvent': function(event) { return event['payload']['foo']['bar']; },
+  'FollowEvent': function(event) { return event['payload']['foo']['bar']; },
+  'ForkEvent': function(event) { return event['payload']['forkee']['html_url']; },
+  'ForkApplyEvent': function(event) { return event['payload']['foo']['bar']; },
+  'GistEvent': function(event) { return event['payload']['foo']['bar']; },
+  'GollumEvent': function(event) { return event['payload']['pages'][0]['html_url']; },
+  'IssueCommentEvent': function(event) { return event['payload']['comment']['html_url']; },
+  'IssuesEvent': function(event) { return event['payload']['issue']['html_url']; },
+  'MemberEvent': function(event) { return event['repo']['url'] + '/collaborators'; },
+  'PageBuildEvent': function(event) { return event['payload']['foo']['bar']; },
+  'PublicEvent': function(event) { return event['repo']['url'].replace("api.", "").replace('/repos', ''); },
+  'PullRequestEvent': function(event) { return event['payload']['pull_request']['html_url']; },
+  'PullRequestReviewCommentEvent': function(event) { return event['payload']['comment']['html_url']; },
+  'PushEvent': function(event) { return 'https://github.com/'+ event['repo']['name'] + '/commit/' + event['payload']['head']; },
+  'ReleaseEvent': function(event) { return event['payload']['release']['html_url']; },
+  'StatusEvent': function(event) { return event['payload']['foo']['bar']; },
+  'TeamAddEvent': function(event) { return event['repo']['url']['bar']; },
+  'WatchEvent': function(event) { return 'https://github.com/' + event['repo']['name'] + '/watchers'; },
+};
+
 function dispatchEvent(event) {
   getUser(event.actor, function (err, user) {
     if (err) {
@@ -136,7 +162,8 @@ function dispatchEvent(event) {
       redis.publish(Redis.EVENT_QUEUE, JSON.stringify({
         event: event,
         user: user,
-        geo: geoData.results[0].geometry.location
+        geo: geoData.results[0].geometry.location,
+        event_url: eventMap[event.type](event)
       }));
     });
   });
