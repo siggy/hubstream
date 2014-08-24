@@ -35,6 +35,9 @@ a {
 .fullname {
   font-size: 26px;
 }
+.data-spacer {
+  height: 57px;
+}
 .github {
   bottom: 0;
 }

@@ -74,10 +74,9 @@ function processEvent(data) {
             '<li>' +
               data.user.location +
             '</li>' +
+            '<li class="data-spacer">&nbsp;</li>' +
           '</ul>' +
           '<ul class="github">' +
-            '<li>&nbsp;</li>' +
-            '<li>&nbsp;</li>' +
             '<li>' +
               '<a target="_blank" href="' + data.user.html_url + '">' +
                 '<img src="https://github.com/favicon.ico" class="favicon"></img>' +
