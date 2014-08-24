@@ -85,7 +85,7 @@ function geocode(userLocation, callback) {
         console.log(errStr);
         callback(errStr, null);
       } else if (data.status == 'OVER_QUERY_LIMIT') {
-        var errStr = 'geocode: sleeping for ' + geoBackoff / 1000 + ' seconds'
+        var errStr = 'geocode: sleeping for ' + geoBackoff / 1000 + ' seconds';
         stats.geoOverLimit++;
         geoNextTry = new Date().getTime() + geoBackoff;
         geoBackoff *= 2;
@@ -214,7 +214,12 @@ var checkGithubLimit = function () {
       } else {
         stats.githubRemaining = 0;
       }
-      stats.githubReset = limits.resources.core.reset*1000 - (new Date().getTime());
+      var reset = limits.resources.core.reset*1000 - (new Date().getTime());
+      if (reset > 0) {
+        stats.githubReset = reset;
+      } else {
+        stats.githubReset = 0;
+      }
 
       if (stats.githubRemaining == 0) {
         stats.githubOverLimit++;
