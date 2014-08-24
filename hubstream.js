@@ -14,23 +14,26 @@ function initialize() {
 
   infowindow = new google.maps.InfoWindow();
 
-  // disable autoplay on map click
-  // this only works because marker click events don't appear to propagate correctly
-  google.maps.event.addListener(map, 'click', function() {
-    clearTimeout(autoplayTimer);
-  });
+  // don't autoplay on mobile devices
+  if (!/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+    // disable autoplay on map click
+    // this only works because marker click events don't appear to propagate correctly
+    google.maps.event.addListener(map, 'click', function() {
+      clearTimeout(autoplayTimer);
+    });
 
-  var autoplay = function() {
-    if (markers.length) {
-      if (markers[markers.length-1] !== lastMarker) {
-        lastMarker = markers[markers.length-1];
-        google.maps.event.trigger(lastMarker, 'click');
+    var autoplay = function() {
+      if (markers.length) {
+        if (markers[markers.length-1] !== lastMarker) {
+          lastMarker = markers[markers.length-1];
+          google.maps.event.trigger(lastMarker, 'click');
+        }
       }
-    }
 
-    autoplayTimer = setTimeout(autoplay, 1500);
+      autoplayTimer = setTimeout(autoplay, 1500);
+    }
+    autoplay();
   }
-  autoplay();
 
   var host = location.origin.replace(/^http/, 'ws');
   var ws = new WebSocket(host);

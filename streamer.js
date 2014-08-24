@@ -1,3 +1,6 @@
+// data flow:
+// github/events -> github/users -> geocode -> publish to event queue
+
 var GitHub      = require('github'),
     geocoder    = require('geocoder'),
     Redis       = require('./redis');
