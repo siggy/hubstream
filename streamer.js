@@ -52,44 +52,52 @@ var geoBackoff = 1000;
 var geoNextTry = 0;
 function geocode(userLocation, callback) {
   if (!userLocation) {
+    callback('geocode: userLocation is null', null);
     return;
   }
   stats.geoLocations++;
   redis.hget(GEO_CACHE, userLocation, function (err, json) {
     if (json) {
       stats.geoCacheHits++;
-      return callback(0, JSON.parse(json));
+      callback(0, JSON.parse(json));
+      return;
     } else if (err) {
       console.log('redis.hget error: ' + GEO_CACHE + ': ' + err);
-      return callback(err, null);
+      callback(err, null);
+      return;
     }
 
     stats.geoCacheMisses++;
 
     if (new Date().getTime() < geoNextTry) {
       stats.geoLimitSkips++;
+      callback('geocode: geoLimitSkip', null);
       return;
     }
 
     geocoder.geocode(userLocation, function (err, data) {
       if (err) {
-        console.log('geocode.geocode error: ' + err);
-        return;
-      }
-
-      if (data.status == 'OVER_QUERY_LIMIT') {
+        var errStr = 'geocode.geocode error: ' + err;
+        console.log(errStr);
+        callback(errStr, null);
+      } else if (data.status == 'OVER_QUERY_LIMIT') {
+        var errStr = 'geocode: sleeping for ' + geoBackoff / 1000 + ' seconds'
         stats.geoOverLimit++;
-        console.log('geocode: sleeping for ' + geoBackoff / 1000 + ' seconds');
         geoNextTry = new Date().getTime() + geoBackoff;
         geoBackoff *= 2;
+        console.log(errStr);
+        callback(errStr, null);
       } else if (data.status == 'OK') {
         redis.hset(GEO_CACHE, userLocation, JSON.stringify(data));
         geoBackoff = 1000;
         geoNextTry = 0;
         callback(0, data);
+      } else {
+        var errStr = 'geocoder.gecode: unknown status: ' + data.status;
+        console.log(errStr);
+        callback(errStr, null);
       }
     });
-
   });
 };
 
@@ -99,8 +107,13 @@ function getUserFromGithub(login, callback) {
       redis.hset(USER_CACHE, user.id, JSON.stringify(user));
       callback(0, user);
     } else if (err) {
-      console.log('github.user.getFrom error: ' + err);
-      callback(err, null);
+      var errStr = 'github.user.getFrom error: ' + err;
+      console.log(errStr);
+      callback(errStr, null);
+    } else {
+      var errStr = 'github.user.getFrom unknown state';
+      console.log(errStr);
+      callback(errStr, null);
     }
   });
 };
@@ -109,10 +122,12 @@ function getUser(actor, callback) {
   redis.hget(USER_CACHE, actor.id, function (err, json) {
     if (json) {
       stats.githubCacheHits++;
-      return callback(0, JSON.parse(json));
+      callback(0, JSON.parse(json));
+      return;
     } else if (err) {
       console.log('redis.hget error: ' + USER_CACHE + ': ' + err);
-      return callback(err, null);
+      callback(err, null);
+      return;
     }
 
     stats.githubCacheMisses++;
@@ -123,6 +138,7 @@ function getUser(actor, callback) {
       setTimeout(function() { getUserFromGithub(actor.login, callback); }, stats.eventTimer);
     } else {
       stats.eventsDropped++;
+      callback('getUser eventsDropped', null);
     }
   });
 };
@@ -157,6 +173,10 @@ function dispatchEvent(event) {
   getUser(event.actor, function (err, user) {
     if (err) {
       console.log('getUser error: ' + err);
+      return;
+    }
+
+    if (!user.location) {
       return;
     }
 
