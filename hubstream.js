@@ -1,22 +1,44 @@
 var map;
+var markers    = [];
+var lastMarker;
+var infowindow = new google.maps.InfoWindow();
+var autoplay   = true;
+
 function initialize() {
-  var mapOptions = {
+  map = new google.maps.Map(document.getElementById('map-canvas'), {
     center: new google.maps.LatLng(30, 0),
-    zoom: 2
+    zoom: 2,
+    disableDefaultUI: true,
+    mapTypeControl: true
+  });
+
+  // disable autoplay on map click
+  // this only works because marker click events don't appear to propagate correctly
+  google.maps.event.addListener(map, 'click', function() {
+    autoplay = false;
+  });
+
+  var autoPlayFn = function() {
+    if (markers.length) {
+      if (markers[markers.length-1] !== lastMarker) {
+        lastMarker = markers[markers.length-1];
+        google.maps.event.trigger(lastMarker, 'click');
+      }
+    }
+
+    if (autoplay) {
+      setTimeout(autoPlayFn, 1500);
+    }
+  }
+  autoPlayFn();
+
+  var host = location.origin.replace(/^http/, 'ws');
+  var ws = new WebSocket(host);
+  ws.onmessage = function (message) {
+    processEvent(JSON.parse(message.data));
   };
-  map = new google.maps.Map(document.getElementById('map-canvas'), mapOptions);
 }
 google.maps.event.addDomListener(window, 'load', initialize);
-
-var host = location.origin.replace(/^http/, 'ws')
-var ws = new WebSocket(host);
-ws.onmessage = function (message) {
-  processEvent(JSON.parse(message.data));
-};
-
-var markers = [];
-var infowindow = new google.maps.InfoWindow();
-var autoplay = true;
 
 function processEvent(data) {
   var marker = new google.maps.Marker({
@@ -33,14 +55,9 @@ function processEvent(data) {
   });
 
   markers.push(marker);
-  if (markers.length > 100) {
+  if (markers.length > 200) {
     markers.shift().setMap(null);
   }
-
-  // this *should* trigger on all propagated marker click events, but it doesn't, so it works for now
-  google.maps.event.addListener(map, 'click', function() {
-    autoplay = false;
-  });
 
   google.maps.event.addListener(marker, 'click', function() {
     infowindow.setContent(
@@ -75,7 +92,4 @@ function processEvent(data) {
 
     infowindow.open(map, marker);
   });
-  if (autoplay) {
-    google.maps.event.trigger(marker, 'click');
-  }
 }
