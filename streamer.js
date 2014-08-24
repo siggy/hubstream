@@ -168,7 +168,7 @@ var eventMap = {
   'ReleaseEvent': function(event) { return event['payload']['release']['html_url']; },
   'StatusEvent': function(event) { return event['payload']['foo']['bar']; },
   'TeamAddEvent': function(event) { return event['repo']['url']['bar']; },
-  'WatchEvent': function(event) { return 'https://github.com/' + event['repo']['name'] + '/watchers'; },
+  'WatchEvent': function(event) { return 'https://github.com/' + event['repo']['name'] + '/stargazers'; },
 };
 
 function dispatchEvent(event) {

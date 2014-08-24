@@ -1,8 +1,8 @@
 var map;
-var markers    = [];
+var markers = [];
 var lastMarker;
-var infowindow = new google.maps.InfoWindow();
-var autoplay   = true;
+var infowindow;
+var autoplayTimer;
 
 function initialize() {
   map = new google.maps.Map(document.getElementById('map-canvas'), {
@@ -12,13 +12,15 @@ function initialize() {
     mapTypeControl: true
   });
 
+  infowindow = new google.maps.InfoWindow();
+
   // disable autoplay on map click
   // this only works because marker click events don't appear to propagate correctly
   google.maps.event.addListener(map, 'click', function() {
-    autoplay = false;
+    clearTimeout(autoplayTimer);
   });
 
-  var autoPlayFn = function() {
+  var autoplay = function() {
     if (markers.length) {
       if (markers[markers.length-1] !== lastMarker) {
         lastMarker = markers[markers.length-1];
@@ -26,11 +28,9 @@ function initialize() {
       }
     }
 
-    if (autoplay) {
-      setTimeout(autoPlayFn, 1500);
-    }
+    autoplayTimer = setTimeout(autoplay, 1500);
   }
-  autoPlayFn();
+  autoplay();
 
   var host = location.origin.replace(/^http/, 'ws');
   var ws = new WebSocket(host);
@@ -49,7 +49,7 @@ function processEvent(data) {
       url: data.user.avatar_url,
       size: new google.maps.Size(24, 24),
       origin: new google.maps.Point(0, 0),
-      anchor: new google.maps.Point(0, 0),
+      anchor: new google.maps.Point(0, 24),
       scaledSize: new google.maps.Size(24, 24)
     }
   });
