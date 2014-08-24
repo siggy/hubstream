@@ -5,12 +5,12 @@
     "type": "git",
     "url": "https://github.com/siggy/hubstream.git"
   },
-  "description": "streaming github events on a google map",
+  "description": "Realtime streaming Github events on a Google Map",
   "main": "web.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "siggy <andrew@sig.gy>",
+  "author": "Andrew Seigner <andrew@sig.gy>",
   "license": "ISC",
   "dependencies": {
     "express": "^4.8.5",
