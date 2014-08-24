@@ -2,7 +2,7 @@ var GitHub      = require('github'),
     geocoder    = require('geocoder'),
     Redis       = require('./redis');
 
-redis = Redis.createClient();
+var redis = Redis.createClient();
 
 var USER_CACHE   = 'user_cache';
 var GEO_CACHE    = 'geo_cache';
@@ -19,6 +19,7 @@ var stats = {
 
   eventTimer: 1000,
   eventsTimer: 1000,
+  githubTimer: 1000,
 
   githubRemaining: 0,
   githubReset: 0,
@@ -169,8 +170,9 @@ function dispatchEvent(event) {
   });
 };
 
-var githubTimer = 1000;
 var checkGithubLimit = function () {
+  console.log(stats);
+
   github.misc.rateLimit({}, function(err, limits) {
     if (err) {
       console.log('github.misc.rateLimit error: ' + err);
@@ -185,15 +187,15 @@ var checkGithubLimit = function () {
 
       if (stats.githubRemaining == 0) {
         stats.githubOverLimit++;
-        githubTimer *= 2;
+        stats.githubTimer *= 2;
         console.log('github over limit: ' + stats.githubRemaining + ' remaining');
-        console.log('github backoff increased to: ' + githubTimer + 'ms');
+        console.log('github backoff increased to: ' + stats.githubTimer + 'ms');
       } else {
-        githubTimer = 1000;
+        stats.githubTimer = 1000;
       }
     }
 
-    setTimeout(checkGithubLimit, githubTimer);
+    setTimeout(checkGithubLimit, stats.githubTimer);
   });
 };
 checkGithubLimit();
@@ -232,11 +234,11 @@ var getEvents = function () {
 
     stats.events += events.length;
     stats.eventsUnique += newEvents.length;
-    console.log(stats);
+    // console.log(stats);
 
     newEvents.forEach(function(event, i) {
       // for that more organic feel
-      timeout = i ? Math.abs(Date.parse(event.created_at) - Date.parse(newEvents[i-1].created_at)) : 0;
+      timeout = i ? Math.abs(Date.parse(event.created_at) - Date.parse(newEvents[0].created_at)) : 0;
       setTimeout(function () {
         dispatchEvent(event);
       }, timeout);
