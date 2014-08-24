@@ -62,8 +62,9 @@ function geocode(userLocation, callback) {
       callback(0, JSON.parse(json));
       return;
     } else if (err) {
-      console.log('redis.hget error: ' + GEO_CACHE + ': ' + err);
-      callback(err, null);
+      var errStr = 'redis.hget error: ' + GEO_CACHE + ': ' + err;
+      console.log(errStr);
+      callback(errStr, null);
       return;
     }
 
@@ -125,8 +126,9 @@ function getUser(actor, callback) {
       callback(0, JSON.parse(json));
       return;
     } else if (err) {
-      console.log('redis.hget error: ' + USER_CACHE + ': ' + err);
-      callback(err, null);
+      var errStr = 'redis.hget error: ' + USER_CACHE + ': ' + err;
+      console.log(errStr);
+      callback(errStr, null);
       return;
     }
 
@@ -236,6 +238,7 @@ var getEvents = function () {
   github.events.get({}, function (err, events) {
     if (err) {
       console.log('github.events.get error: ' + err);
+      setTimeout(getEvents, stats.eventsTimer);
       return;
     }
 
