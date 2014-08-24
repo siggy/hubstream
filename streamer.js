@@ -7,8 +7,9 @@ var redis = Redis.createClient();
 var USER_CACHE   = 'user_cache';
 var GEO_CACHE    = 'geo_cache';
 
-var GITHUB_MIN_REMAINING = 1000;
-var GITHUB_MAX_EVENT_DELAY_MS = 5000;
+var GITHUB_MIN_API_REMAINING      = 1000;
+var GITHUB_MAX_EVENT_DELAY_MS     = 5000;
+var GITHUB_MIN_RATELIMIT_CHECK_MS = 1000;
 
 var maxEventId = 0;
 
@@ -19,7 +20,7 @@ var stats = {
 
   eventTimer: 1000,
   eventsTimer: 1000,
-  githubTimer: 1000,
+  githubTimer: GITHUB_MIN_RATELIMIT_CHECK_MS,
 
   githubRemaining: 0,
   githubReset: 0,
@@ -58,6 +59,9 @@ function geocode(userLocation, callback) {
     if (json) {
       stats.geoCacheHits++;
       return callback(0, JSON.parse(json));
+    } else if (err) {
+      console.log('redis.hget error: ' + GEO_CACHE + ': ' + err);
+      return callback(err, null);
     }
 
     stats.geoCacheMisses++;
@@ -96,6 +100,7 @@ function getUserFromGithub(login, callback) {
       callback(0, user);
     } else if (err) {
       console.log('github.user.getFrom error: ' + err);
+      callback(err, null);
     }
   });
 };
@@ -106,7 +111,8 @@ function getUser(actor, callback) {
       stats.githubCacheHits++;
       return callback(0, JSON.parse(json));
     } else if (err) {
-      console.log('redis.hget error: ' + err);
+      console.log('redis.hget error: ' + USER_CACHE + ': ' + err);
+      return callback(err, null);
     }
 
     stats.githubCacheMisses++;
@@ -178,8 +184,8 @@ var checkGithubLimit = function () {
       console.log('github.misc.rateLimit error: ' + err);
       stats.githubRemaining = 0;
     } else {
-      if (limits.resources.core.remaining > GITHUB_MIN_REMAINING) {
-        stats.githubRemaining = limits.resources.core.remaining - GITHUB_MIN_REMAINING
+      if (limits.resources.core.remaining > GITHUB_MIN_API_REMAINING) {
+        stats.githubRemaining = limits.resources.core.remaining - GITHUB_MIN_API_REMAINING
       } else {
         stats.githubRemaining = 0;
       }
@@ -191,7 +197,7 @@ var checkGithubLimit = function () {
         console.log('github over limit: ' + stats.githubRemaining + ' remaining');
         console.log('github backoff increased to: ' + stats.githubTimer + 'ms');
       } else {
-        stats.githubTimer = 1000;
+        stats.githubTimer = GITHUB_MIN_RATELIMIT_CHECK_MS;
       }
     }
 

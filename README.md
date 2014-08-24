@@ -1,7 +1,7 @@
 Hubstream
 ===========
 
-Realtime streaming Github events on a Google Map
+Streaming Github events on a Google Map
 
 Local
 
