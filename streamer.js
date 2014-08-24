@@ -234,7 +234,6 @@ var getEvents = function () {
 
     stats.events += events.length;
     stats.eventsUnique += newEvents.length;
-    // console.log(stats);
 
     newEvents.forEach(function(event, i) {
       // for that more organic feel

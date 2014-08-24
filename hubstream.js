@@ -16,6 +16,7 @@ ws.onmessage = function (message) {
 
 var markers = [];
 var infowindow = new google.maps.InfoWindow();
+var autoplay = true;
 
 function processEvent(data) {
   var marker = new google.maps.Marker({
@@ -35,6 +36,11 @@ function processEvent(data) {
   if (markers.length > 100) {
     markers.shift().setMap(null);
   }
+
+  // this *should* trigger on all propagated marker click events, but it doesn't, so it works for now
+  google.maps.event.addListener(map, 'click', function() {
+    autoplay = false;
+  });
 
   google.maps.event.addListener(marker, 'click', function() {
     infowindow.setContent(
@@ -69,5 +75,7 @@ function processEvent(data) {
 
     infowindow.open(map, marker);
   });
-  // google.maps.event.trigger(marker, 'click');
+  if (autoplay) {
+    google.maps.event.trigger(marker, 'click');
+  }
 }
