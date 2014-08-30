@@ -65,7 +65,7 @@ function processEvent(data) {
   google.maps.event.addListener(marker, 'click', function() {
     infowindow.setContent(
       '<div class="infowindow">' +
-        '<a target="_blank" href="' + data.user.html_url + '">' +
+        '<a target="_blank" href="https://github.com/' + data.user.login + '">' +
           '<img src="' + data.user.avatar_url + '" class="avatar" alt="' + data.user.login + '" title="' + data.user.login + '">' +
         '</a>' +
         '<div class="data">' +
@@ -78,12 +78,12 @@ function processEvent(data) {
           '</ul>' +
           '<ul class="github">' +
             '<li>' +
-              '<a target="_blank" href="' + data.user.html_url + '">' +
+              '<a target="_blank" href="https://github.com/' + data.user.login + '">' +
                 '<img src="https://github.com/favicon.ico" class="favicon"></img>' +
               '</a>' +
             '</li>' +
             '<li>' +
-              '<a target="_blank" href="' + data.user.html_url + '">' + data.user.login +'</a>' +
+              '<a target="_blank" href="https://github.com/' + data.user.login + '">' + data.user.login +'</a>' +
             '</li>' +
             '<li><a target="_blank" href="https://github.com/' + data.event.repo.name + '">' + data.event.repo.name + '</a></li>' +
             '<li><a target="_blank" href="' + data.event_url + '">' + data.event.type + '</a></li>' +

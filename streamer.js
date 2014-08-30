@@ -105,11 +105,25 @@ function geocode(userLocation, callback) {
   });
 };
 
+var trimmedUserFields = [
+  'avatar_url',
+  'id',
+  'location',
+  'login',
+  'name'
+];
+
 function getUserFromGithub(login, callback) {
   github.user.getFrom({user: login}, function (err, user) {
     if (user) {
-      redis.hset(USER_CACHE, user.id, JSON.stringify(user));
-      callback(0, user);
+      // trim user down to what we need, save space in redis
+      var trimmedUser = {};
+      for (var i = 0; i < trimmedUserFields.length; i++) {
+        trimmedUser[trimmedUserFields[i]] = user[trimmedUserFields[i]];
+      }
+
+      redis.hset(USER_CACHE, user.id, JSON.stringify(trimmedUser));
+      callback(0, trimmedUser);
     } else if (err) {
       var errStr = 'github.user.getFrom error: ' + err;
       console.log(errStr);
