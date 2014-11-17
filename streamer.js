@@ -31,7 +31,6 @@ var stats = {
   githubReset: 0,
   githubLimitSkips: 0,
   githubOverLimit: 0,
-  githubCacheHitsNew: 0,
   githubCacheHits: 0,
   githubCacheMisses: 0,
 
@@ -142,29 +141,14 @@ function getUserFromGithub(login, callback) {
 };
 
 function getUser(actor, callback) {
-  // try new-style key first
   var key = USER_CACHE + ":" + actor.id;
   redis.hget(key, USER_FIELD, function (err, json) {
-    if (json) {
-      stats.githubCacheHitsNew++;
-      callback(0, JSON.parse(json));
-      return;
-    } else if (err) {
-      var errStr = 'redis.hget error: ' + key + ': ' + err;
-      console.log(errStr);
-      callback(errStr, null);
-      return;
-    }
-  });
-
-  // fall back to old-style key
-  redis.hget(USER_CACHE, actor.id, function (err, json) {
     if (json) {
       stats.githubCacheHits++;
       callback(0, JSON.parse(json));
       return;
     } else if (err) {
-      var errStr = 'redis.hget error: ' + USER_CACHE + ': ' + err;
+      var errStr = 'redis.hget error: ' + key + ': ' + err;
       console.log(errStr);
       callback(errStr, null);
       return;
