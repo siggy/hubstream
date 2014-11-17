@@ -7,8 +7,10 @@ var GitHub      = require('github'),
 
 var redis = Redis.createClient();
 
-var USER_CACHE   = 'user_cache';
-var GEO_CACHE    = 'geo_cache';
+var USER_CACHE = 'user_cache';
+var USER_FIELD = 'json';
+var USER_TTL   = 86400;
+var GEO_CACHE  = 'geo_cache';
 
 var GITHUB_MIN_API_REMAINING      = 1000;
 var GITHUB_MAX_EVENT_DELAY_MS     = 5000;
@@ -29,6 +31,7 @@ var stats = {
   githubReset: 0,
   githubLimitSkips: 0,
   githubOverLimit: 0,
+  githubCacheHitsNew: 0,
   githubCacheHits: 0,
   githubCacheMisses: 0,
 
@@ -122,7 +125,9 @@ function getUserFromGithub(login, callback) {
         trimmedUser[trimmedUserFields[i]] = user[trimmedUserFields[i]];
       }
 
-      redis.hset(USER_CACHE, user.id, JSON.stringify(trimmedUser));
+      var key = USER_CACHE + ":" + user.id;
+      redis.hset(key, USER_FIELD, JSON.stringify(trimmedUser));
+      redis.expire(key, USER_TTL);
       callback(0, trimmedUser);
     } else if (err) {
       var errStr = 'github.user.getFrom error: ' + err;
@@ -137,6 +142,22 @@ function getUserFromGithub(login, callback) {
 };
 
 function getUser(actor, callback) {
+  // try new-style key first
+  var key = USER_CACHE + ":" + actor.id;
+  redis.hget(key, USER_FIELD, function (err, json) {
+    if (json) {
+      stats.githubCacheHitsNew++;
+      callback(0, JSON.parse(json));
+      return;
+    } else if (err) {
+      var errStr = 'redis.hget error: ' + key + ': ' + err;
+      console.log(errStr);
+      callback(errStr, null);
+      return;
+    }
+  });
+
+  // fall back to old-style key
   redis.hget(USER_CACHE, actor.id, function (err, json) {
     if (json) {
       stats.githubCacheHits++;
