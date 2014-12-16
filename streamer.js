@@ -8,9 +8,9 @@ var GitHub      = require('github'),
 var redis = Redis.createClient();
 
 var USER_CACHE = 'user_cache';
-var USER_FIELD = 'json';
-var USER_TTL   = 86400;
 var GEO_CACHE  = 'geo_cache';
+var HASH_FIELD = 'json';
+var HASH_TTL   = 86400;
 
 var GITHUB_MIN_API_REMAINING      = 1000;
 var GITHUB_MAX_EVENT_DELAY_MS     = 5000;
@@ -37,7 +37,8 @@ var stats = {
   geoLocations: 0,
   geoLimitSkips: 0,
   geoOverLimit: 0,
-  geoCacheHits: 0,
+  geoCacheHitsNew: 0,
+  geoCacheHitsOld: 0,
   geoCacheMisses: 0
 };
 
@@ -55,23 +56,60 @@ github.authenticate({
 
 var geoBackoff = 1000;
 var geoNextTry = 0;
+
+function setRedis(hash, field, data) {
+  var key = hash + ":" + field;
+  redis.hset(key, HASH_FIELD, JSON.stringify(data));
+  redis.expire(key, HASH_TTL);
+}
+
+function getRedis(hash, field, callback) {
+  var key = hash + ":" + field;
+  redis.hget(key, HASH_FIELD, function (err, json) {
+    if (err) {
+      var errStr = 'redis.hget error ' + err + ' for ' + key;
+      console.log(errStr);
+      callback(errStr, null);
+      return;
+    }
+
+    callback(0, JSON.parse(json));
+  });
+}
+
 function geocode(userLocation, callback) {
   if (!userLocation) {
     callback('geocode: userLocation is null', null);
     return;
   }
   stats.geoLocations++;
-  redis.hget(GEO_CACHE, userLocation, function (err, json) {
+
+  // new-style geo
+  getRedis(GEO_CACHE, userLocation, function (err, json) {
     if (json) {
-      stats.geoCacheHits++;
-      callback(0, JSON.parse(json));
+      stats.geoCacheHitsNew++;
+      callback(0, json);
       return;
     } else if (err) {
-      var errStr = 'redis.hget error: ' + GEO_CACHE + ': ' + err;
+      var errStr = 'getRedis error: ' + err + ' for ' + userLocation;
       console.log(errStr);
       callback(errStr, null);
       return;
     }
+
+    // old-style geo
+    redis.hget(GEO_CACHE, userLocation, function (err, json) {
+      if (json) {
+        stats.geoCacheHitsOld++;
+        callback(0, JSON.parse(json));
+        return;
+      } else if (err) {
+        var errStr = 'redis.hget error ' + err + ' for ' + GEO_CACHE + ':' + userLocation;
+        console.log(errStr);
+        callback(errStr, null);
+        return;
+      }
+    });
 
     stats.geoCacheMisses++;
 
@@ -83,7 +121,7 @@ function geocode(userLocation, callback) {
 
     geocoder.geocode(userLocation, function (err, data) {
       if (err) {
-        var errStr = 'geocode.geocode error: ' + err;
+        var errStr = 'geocode.geocode error ' + err + ' for ' + userLocation;
         console.log(errStr);
         callback(errStr, null);
       } else if (data.status == 'OVER_QUERY_LIMIT') {
@@ -94,12 +132,12 @@ function geocode(userLocation, callback) {
         console.log(errStr);
         callback(errStr, null);
       } else if (data.status == 'OK') {
-        redis.hset(GEO_CACHE, userLocation, JSON.stringify(data));
+        setRedis(GEO_CACHE, userLocation, data);
         geoBackoff = 1000;
         geoNextTry = 0;
         callback(0, data);
       } else {
-        var errStr = 'geocoder.gecode: unknown status: ' + data.status;
+        var errStr = 'geocoder.gecode: unknown status ' + data.status + ' for ' + userLocation;
         console.log(errStr);
         callback(errStr, null);
       }
@@ -124,16 +162,14 @@ function getUserFromGithub(login, callback) {
         trimmedUser[trimmedUserFields[i]] = user[trimmedUserFields[i]];
       }
 
-      var key = USER_CACHE + ":" + user.id;
-      redis.hset(key, USER_FIELD, JSON.stringify(trimmedUser));
-      redis.expire(key, USER_TTL);
+      setRedis(USER_CACHE, user.id, trimmedUser);
       callback(0, trimmedUser);
     } else if (err) {
-      var errStr = 'github.user.getFrom error: ' + err;
+      var errStr = 'github.user.getFrom error: ' + err + ' for ' + login;
       console.log(errStr);
       callback(errStr, null);
     } else {
-      var errStr = 'github.user.getFrom unknown state';
+      var errStr = 'github.user.getFrom unknown state for ' + login;
       console.log(errStr);
       callback(errStr, null);
     }
@@ -141,14 +177,13 @@ function getUserFromGithub(login, callback) {
 };
 
 function getUser(actor, callback) {
-  var key = USER_CACHE + ":" + actor.id;
-  redis.hget(key, USER_FIELD, function (err, json) {
+  getRedis(USER_CACHE, actor.id, function (err, json) {
     if (json) {
       stats.githubCacheHits++;
-      callback(0, JSON.parse(json));
+      callback(0, json);
       return;
     } else if (err) {
-      var errStr = 'redis.hget error: ' + key + ': ' + err;
+      var errStr = 'getRedis error: ' + err + ' for ' + actor.id;;
       console.log(errStr);
       callback(errStr, null);
       return;
