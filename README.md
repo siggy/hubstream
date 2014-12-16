@@ -14,3 +14,6 @@ Deploy
     heroku addons:add redistogo
     git push heroku master
     heroku open
+
+Deploy branch
+    git push heroku branch:master
