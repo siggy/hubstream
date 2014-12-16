@@ -37,8 +37,7 @@ var stats = {
   geoLocations: 0,
   geoLimitSkips: 0,
   geoOverLimit: 0,
-  geoCacheHitsNew: 0,
-  geoCacheHitsOld: 0,
+  geoCacheHits: 0,
   geoCacheMisses: 0
 };
 
@@ -87,7 +86,7 @@ function geocode(userLocation, callback) {
   // new-style geo
   getRedis(GEO_CACHE, userLocation, function (err, json) {
     if (json) {
-      stats.geoCacheHitsNew++;
+      stats.geoCacheHits++;
       callback(0, json);
       return;
     } else if (err) {
@@ -96,20 +95,6 @@ function geocode(userLocation, callback) {
       callback(errStr, null);
       return;
     }
-
-    // old-style geo
-    redis.hget(GEO_CACHE, userLocation, function (err, json) {
-      if (json) {
-        stats.geoCacheHitsOld++;
-        callback(0, JSON.parse(json));
-        return;
-      } else if (err) {
-        var errStr = 'redis.hget error ' + err + ' for ' + GEO_CACHE + ':' + userLocation;
-        console.log(errStr);
-        callback(errStr, null);
-        return;
-      }
-    });
 
     stats.geoCacheMisses++;
 
