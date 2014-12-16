@@ -13,14 +13,20 @@ a {
   color: #4183c4;
   text-decoration: none;
 }
+/*.infowindow {
+  max-width: 1000px;
+}
+*/
 .avatar {
-  vertical-align: top;
+  /*left: 0;*/
+  /*vertical-align: top;*/
   float: left;
   height: 200px;
-  width: 200px;
+  /*width: 200px;*/
   border-radius: 6px;
 }
 .data {
+  /*position: relative;*/
   font-size: 20px;
   font-weight: normal;
   font-family: Helvetica, arial, freesans, clean, sans-serif, 'Segoe UI Emoji', 'Segoe UI Symbol';
@@ -35,10 +41,8 @@ a {
 .fullname {
   font-size: 26px;
 }
-.data-spacer {
-  height: 53px;
-}
 .github {
+  /*position: absolute;*/
   bottom: 0;
 }
 .favicon {

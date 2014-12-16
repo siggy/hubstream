@@ -4,6 +4,8 @@ var lastMarker;
 var infowindow;
 var autoplayTimer;
 
+var kill = false;
+
 function initialize() {
   map = new google.maps.Map(document.getElementById('map-canvas'), {
     center: new google.maps.LatLng(30, 0),
@@ -17,9 +19,9 @@ function initialize() {
   // don't autoplay on mobile devices
   if (!/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
     // disable autoplay on map click
-    // this only works because marker click events don't appear to propagate correctly
     google.maps.event.addListener(map, 'click', function() {
       clearTimeout(autoplayTimer);
+      kill = true;
     });
 
     var autoplay = function() {
@@ -38,6 +40,9 @@ function initialize() {
   var host = location.origin.replace(/^http/, 'ws');
   var ws = new WebSocket(host);
   ws.onmessage = function (message) {
+    if (kill) {
+      return;
+    }
     processEvent(JSON.parse(message.data));
   };
 }
@@ -74,7 +79,6 @@ function processEvent(data) {
             '<li>' +
               data.user.location +
             '</li>' +
-            '<li class="data-spacer">&nbsp;</li>' +
           '</ul>' +
           '<ul class="github">' +
             '<li>' +
@@ -93,5 +97,7 @@ function processEvent(data) {
     );
 
     infowindow.open(map, marker);
+
+    infowindow.setContent(infowindow.getContent());
   });
 }
