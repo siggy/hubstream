@@ -37,7 +37,8 @@ var stats = {
   geoLocations: 0,
   geoLimitSkips: 0,
   geoOverLimit: 0,
-  geoCacheHits: 0,
+  geoCacheHitsTrimmed: 0,
+  geoCacheHitsFull: 0,
   geoCacheMisses: 0
 };
 
@@ -83,11 +84,19 @@ function geocode(userLocation, callback) {
   }
   stats.geoLocations++;
 
-  // new-style geo
   getRedis(GEO_CACHE, userLocation, function (err, json) {
     if (json) {
-      stats.geoCacheHits++;
-      callback(0, json);
+      // check for trimmed geo
+      if (json.lat !== undefined) {
+        // trimmed geo
+        stats.geoCacheHitsTrimmed++;
+        callback(0, json);
+      } else {
+        // old-style full geo
+        stats.geoCacheHitsFull++;
+        callback(0, json.results[0].geometry.location);
+      }
+
       return;
     } else if (err) {
       var errStr = 'getRedis error: ' + err + ' for ' + userLocation;
@@ -117,10 +126,11 @@ function geocode(userLocation, callback) {
         console.log(errStr);
         callback(errStr, null);
       } else if (data.status == 'OK') {
-        setRedis(GEO_CACHE, userLocation, data);
+        var geoData = data.results[0].geometry.location;
+        setRedis(GEO_CACHE, userLocation, geoData);
         geoBackoff = 1000;
         geoNextTry = 0;
-        callback(0, data);
+        callback(0, geoData);
       } else {
         var errStr = 'geocoder.gecode: unknown status ' + data.status + ' for ' + userLocation;
         console.log(errStr);
@@ -233,7 +243,7 @@ function dispatchEvent(event) {
       redis.publish(Redis.EVENT_QUEUE, JSON.stringify({
         event: event,
         user: user,
-        geo: geoData.results[0].geometry.location,
+        geo: geoData,
         event_url: eventMap[event.type](event)
       }));
     });
