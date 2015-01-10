@@ -36,10 +36,13 @@ var stats = {
 
   geoLocations: 0,
   geoLimitSkips: 0,
-  geoOverLimit: 0,
-  geoCacheHitsTrimmed: 0,
-  geoCacheHitsFull: 0,
-  geoCacheMisses: 0
+  geoCacheHits: 0,
+  geoCacheMisses: 0,
+
+  geocodeErr: 0,
+  geocodeOverLimit: 0,
+  geocodeOk: 0,
+  geocodeUnknown: 0
 };
 
 var github = new GitHub({
@@ -86,16 +89,8 @@ function geocode(userLocation, callback) {
 
   getRedis(GEO_CACHE, userLocation, function (err, json) {
     if (json) {
-      // check for trimmed geo
-      if (json.lat !== undefined) {
-        // trimmed geo
-        stats.geoCacheHitsTrimmed++;
-        callback(0, json);
-      } else {
-        // old-style full geo
-        stats.geoCacheHitsFull++;
-        callback(0, json.results[0].geometry.location);
-      }
+      stats.geoCacheHits++;
+      callback(0, json);
 
       return;
     } else if (err) {
@@ -115,23 +110,30 @@ function geocode(userLocation, callback) {
 
     geocoder.geocode(userLocation, function (err, data) {
       if (err) {
+        stats.geocodeErr += 1;
+
         var errStr = 'geocode.geocode error ' + err + ' for ' + userLocation;
         console.log(errStr);
         callback(errStr, null);
       } else if (data.status == 'OVER_QUERY_LIMIT') {
+        stats.geocodeOverLimit += 1;
+
         var errStr = 'geocode: sleeping for ' + geoBackoff / 1000 + ' seconds';
-        stats.geoOverLimit++;
         geoNextTry = new Date().getTime() + geoBackoff;
         geoBackoff *= 2;
         console.log(errStr);
         callback(errStr, null);
       } else if (data.status == 'OK') {
+        stats.geocodeOk += 1;
+
         var geoData = data.results[0].geometry.location;
         setRedis(GEO_CACHE, userLocation, geoData);
         geoBackoff = 1000;
         geoNextTry = 0;
         callback(0, geoData);
       } else {
+        stats.geocodeUnknown += 1;
+
         var errStr = 'geocoder.gecode: unknown status ' + data.status + ' for ' + userLocation;
         console.log(errStr);
         callback(errStr, null);
