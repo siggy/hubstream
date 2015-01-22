@@ -60,10 +60,12 @@ github.authenticate({
 var geoBackoff = 1000;
 var geoNextTry = 0;
 
-function setRedis(hash, field, data) {
+function setRedis(hash, field, data, ttl) {
   var key = hash + ":" + field;
   redis.hset(key, HASH_FIELD, JSON.stringify(data));
-  redis.expire(key, HASH_TTL);
+  if (ttl > 0) {
+    redis.expire(key, ttl);
+  }
 }
 
 function getRedis(hash, field, callback) {
@@ -127,7 +129,7 @@ function geocode(userLocation, callback) {
         stats.geocodeOk += 1;
 
         var geoData = data.results[0].geometry.location;
-        setRedis(GEO_CACHE, userLocation, geoData);
+        setRedis(GEO_CACHE, userLocation, geoData, 0);
         geoBackoff = 1000;
         geoNextTry = 0;
         callback(0, geoData);
@@ -159,7 +161,7 @@ function getUserFromGithub(login, callback) {
         trimmedUser[trimmedUserFields[i]] = user[trimmedUserFields[i]];
       }
 
-      setRedis(USER_CACHE, user.id, trimmedUser);
+      setRedis(USER_CACHE, user.id, trimmedUser, HASH_TTL);
       callback(0, trimmedUser);
     } else if (err) {
       var errStr = 'github.user.getFrom error: ' + err + ' for ' + login;
