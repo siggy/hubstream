@@ -6,6 +6,7 @@ Streaming Github events on a Google Map
 Local
 
     npm install
+    gem install foreman
     foreman start
 
 Deploy
