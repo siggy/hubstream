@@ -5,25 +5,16 @@ var GitHub      = require('github'),
 var redis = Redis.createClient();
 
 var USER_CACHE = 'user_cache';
-var USER_FIELD = 'json';
-var USER_TTL   = 86400;
-var GEO_CACHE    = 'geo_cache';
-redis.hget(GEO_CACHE, "Thousand Oaks Ca", function (err, json) {
+var GEO_CACHE  = 'geo_cache';
+var HASH_FIELD = 'json';
+var HASH_TTL   = 86400;
+
+redis.keys(USER_CACHE+":*", function(err, json) {console.log(json.length)});
+redis.keys(GEO_CACHE+":*", function(err, json) {console.log(json.length)});
+
+redis.hget(GEO_CACHE+":Thousand Oaks Ca", HASH_FIELD, function (err, json) {
   console.log(json);
 });
-
-redis.hlen(USER_CACHE, function(err, json) {console.log(json)});
-redis.hlen(GEO_CACHE, function(err, json) {console.log(json)});
-
-redis.hscan(GEO_CACHE, 0, function(err, json) {console.log(json)});
-
-redis.hscan(USER_CACHE, 0, function(err, json) {console.log(json)});
-
-redis.expire(USER_CACHE, 10, function(err, json) {console.log(json)});
-
-redis.ttl(USER_CACHE, function(err, json) {console.log(json)});
-
-redis.keys("user*", function(err, json) {console.log(json)});
 
 redis.info(function(err, j) { console.log(j) });
 
@@ -41,8 +32,8 @@ var migrate = function(cursor) {
       console.log("total: " + total);
 
       var key = USER_CACHE + ":" + userId;
-      redis.hset(key, USER_FIELD, data);
-      redis.expire(key, USER_TTL);
+      redis.hset(key, HASH_FIELD, data);
+      redis.expire(key, HASH_TTL);
       redis.hdel(USER_CACHE, userId, function(err, reply) {
         if (reply != 1) {
           console.log("hdel returned " + reply + " for userId: " + userId);

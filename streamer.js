@@ -68,7 +68,7 @@ function setRedis(hash, field, data, ttl) {
   }
 }
 
-function getRedis(hash, field, callback) {
+function getRedis(hash, field, ttl, callback) {
   var key = hash + ":" + field;
   redis.hget(key, HASH_FIELD, function (err, json) {
     if (err) {
@@ -76,6 +76,10 @@ function getRedis(hash, field, callback) {
       console.log(errStr);
       callback(errStr, null);
       return;
+    }
+
+    if (ttl > 0) {
+      redis.expire(key, ttl);
     }
 
     callback(0, JSON.parse(json));
@@ -89,7 +93,7 @@ function geocode(userLocation, callback) {
   }
   stats.geoLocations++;
 
-  getRedis(GEO_CACHE, userLocation, function (err, json) {
+  getRedis(GEO_CACHE, userLocation, 0, function (err, json) {
     if (json) {
       stats.geoCacheHits++;
       callback(0, json);
@@ -176,7 +180,7 @@ function getUserFromGithub(login, callback) {
 };
 
 function getUser(actor, callback) {
-  getRedis(USER_CACHE, actor.id, function (err, json) {
+  getRedis(USER_CACHE, actor.id, HASH_TTL, function (err, json) {
     if (json) {
       stats.githubCacheHits++;
       callback(0, json);
