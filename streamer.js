@@ -269,6 +269,7 @@ var checkGithubLimit = function () {
       if (limits.resources.core.remaining > GITHUB_MIN_API_REMAINING) {
         stats.githubRemaining = limits.resources.core.remaining - GITHUB_MIN_API_REMAINING
       } else {
+        console.log('github over limit: ' + limits);
         stats.githubRemaining = 0;
       }
       var reset = limits.resources.core.reset*1000 - (new Date().getTime());
