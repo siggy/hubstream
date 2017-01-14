@@ -2,6 +2,20 @@ var GitHub      = require('github'),
     geocoder    = require('geocoder'),
     Redis       = require('./redis');
 
+// github
+var github = new GitHub({
+  version: '3.0.0',
+  protocol: 'https',
+  timeout: 5000
+});
+github.authenticate({
+  type: 'oauth',
+  key: process.env.HUBSTREAM_GITHUB_KEY,
+  secret: process.env.HUBSTREAM_GITHUB_SECRET
+});
+github.misc.rateLimit({}, function(err, limits) {console.log(limits)});
+
+// redis
 var redis = Redis.createClient();
 
 var USER_CACHE = 'user_cache';
