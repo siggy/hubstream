@@ -10,9 +10,9 @@ var redis = Redis.createClient();
 var USER_CACHE = 'user_cache';
 var GEO_CACHE  = 'geo_cache';
 var HASH_FIELD = 'json';
-var HASH_TTL   = 86400;
+var HASH_TTL   = 86400*10;
 
-var GITHUB_MIN_API_REMAINING      = 1000;
+var GITHUB_MIN_API_REMAINING      = 100;
 var GITHUB_MAX_EVENT_DELAY_MS     = 5000;
 var GITHUB_MIN_RATELIMIT_CHECK_MS = 1000;
 

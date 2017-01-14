@@ -1,6 +1,6 @@
 var GitHub      = require('github'),
     geocoder    = require('geocoder'),
-    Redis       = require('./redis');
+    Redis       = require('../redis');
 
 var redis = Redis.createClient();
 
