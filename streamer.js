@@ -12,9 +12,10 @@ var GEO_CACHE  = 'geo_cache';
 var HASH_FIELD = 'json';
 var HASH_TTL   = 86400*10;
 
+var GITHUB_REQUEST_INTERVAL_MIN   = 720; // (3600 * 1000 / 5000)
+var GITHUB_REQUEST_INTERVAL_MAX   = 5000;
 var GITHUB_MIN_API_REMAINING      = 100;
-var GITHUB_MAX_EVENT_DELAY_MS     = 5000;
-var GITHUB_MIN_RATELIMIT_CHECK_MS = 1000;
+var GITHUB_MIN_RATELIMIT_CHECK_MS = 5000;
 
 var maxEventId = 0;
 
@@ -23,8 +24,8 @@ var stats = {
   eventsUnique: 0,
   eventsDropped: 0,
 
-  eventTimer: 1000,
-  eventsTimer: 1000,
+  lastUserRequest: 0,
+  eventsTimer: GITHUB_REQUEST_INTERVAL_MIN,
   githubTimer: GITHUB_MIN_RATELIMIT_CHECK_MS,
 
   githubRemaining: 0,
@@ -42,7 +43,10 @@ var stats = {
   geocodeErr: 0,
   geocodeOverLimit: 0,
   geocodeOk: 0,
-  geocodeUnknown: 0
+  geocodeUnknown: 0,
+
+  geoBackoff: 1000,
+  geoNextTry: 0
 };
 
 var github = new GitHub({
@@ -57,8 +61,9 @@ github.authenticate({
   secret: process.env.HUBSTREAM_GITHUB_SECRET
 });
 
-var geoBackoff = 1000;
-var geoNextTry = 0;
+function now() {
+  return new Date().getTime();
+}
 
 function setRedis(hash, field, data, ttl) {
   var key = hash + ":" + field;
@@ -78,6 +83,7 @@ function getRedis(hash, field, ttl, callback) {
       return;
     }
 
+    // update ttl
     if (ttl > 0) {
       redis.expire(key, ttl);
     }
@@ -108,7 +114,7 @@ function geocode(userLocation, callback) {
 
     stats.geoCacheMisses++;
 
-    if (new Date().getTime() < geoNextTry) {
+    if (now() < stats.geoNextTry) {
       stats.geoLimitSkips++;
       callback('geocode: geoLimitSkip', null);
       return;
@@ -124,9 +130,9 @@ function geocode(userLocation, callback) {
       } else if (data.status == 'OVER_QUERY_LIMIT') {
         stats.geocodeOverLimit += 1;
 
-        var errStr = 'geocode: sleeping for ' + geoBackoff / 1000 + ' seconds';
-        geoNextTry = new Date().getTime() + geoBackoff;
-        geoBackoff *= 2;
+        var errStr = 'geocode: sleeping for ' + stats.geoBackoff / 1000 + ' seconds';
+        stats.geoNextTry = now() + stats.geoBackoff;
+        stats.geoBackoff *= 2;
         console.log(errStr);
         callback(errStr, null);
       } else if (data.status == 'OK') {
@@ -134,8 +140,8 @@ function geocode(userLocation, callback) {
 
         var geoData = data.results[0].geometry.location;
         setRedis(GEO_CACHE, userLocation, geoData, 0);
-        geoBackoff = 1000;
-        geoNextTry = 0;
+        stats.geoBackoff = 1000;
+        stats.geoNextTry = 0;
         callback(0, geoData);
       } else {
         stats.geocodeUnknown += 1;
@@ -195,12 +201,12 @@ function getUser(actor, callback) {
     stats.githubCacheMisses++;
 
     // throttle event queries based on time / calls remaining
-    stats.eventTimer = Math.ceil(stats.githubReset / stats.githubRemaining)*2;
-    if (stats.eventTimer < GITHUB_MAX_EVENT_DELAY_MS) {
-      setTimeout(function() { getUserFromGithub(actor.login, callback); }, stats.eventTimer);
+    var delay = 1.1 * stats.githubReset / stats.githubRemaining;
+    if ((now() - stats.lastUserRequest) > delay) {
+      getUserFromGithub(actor.login, callback);
+      stats.lastUserRequest = now();
     } else {
       stats.eventsDropped++;
-      callback('getUser eventsDropped', null);
     }
   });
 };
@@ -267,12 +273,12 @@ var checkGithubLimit = function () {
       stats.githubRemaining = 0;
     } else {
       if (limits.resources.core.remaining > GITHUB_MIN_API_REMAINING) {
-        stats.githubRemaining = limits.resources.core.remaining - GITHUB_MIN_API_REMAINING
+        stats.githubRemaining = limits.resources.core.remaining - GITHUB_MIN_API_REMAINING;
       } else {
         console.log('github over limit: ' + JSON.stringify(limits));
         stats.githubRemaining = 0;
       }
-      var reset = limits.resources.core.reset*1000 - (new Date().getTime());
+      var reset = limits.resources.core.reset*1000 - now();
       if (reset > 0) {
         stats.githubReset = reset;
       } else {
@@ -321,10 +327,12 @@ var getEvents = function () {
     // throttle events queries just enough to not miss any
     if (events.length == newEvents.length) {
       // we may have missed events, cut timer in half
-      stats.eventsTimer = Math.floor(stats.eventsTimer / 2);
+      stats.eventsTimer = Math.max(Math.floor(stats.eventsTimer / 2), GITHUB_REQUEST_INTERVAL_MIN);
     } else if ((events.length / newEvents.length) > 1.2) {
-      // 5 duplicates out of 30 events, bump timer up a bit
-      stats.eventsTimer = Math.min(Math.floor(stats.eventsTimer * 1.1), GITHUB_MAX_EVENT_DELAY_MS);
+      // more than 5 dupes (30 / 25), bump timer up a bit
+      var dupes = events.length - newEvents.length;
+      var increase = 1 + dupes / events.length;
+      stats.eventsTimer = Math.min(Math.floor(stats.eventsTimer * increase), GITHUB_REQUEST_INTERVAL_MAX);
     }
 
     stats.events += events.length;
