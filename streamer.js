@@ -1,25 +1,25 @@
 // data flow:
 // github/events -> github/users -> geocode -> publish to event queue
 
-var GitHub      = require('github'),
-    geocoder    = require('geocoder'),
-    Redis       = require('./redis');
+const GitHub   = require('github'),
+      geocoder = require('geocoder'),
+      Redis    = require('./redis');
 
-var redis = Redis.createClient();
+const redis = Redis.createClient();
 
-var USER_CACHE = 'user_cache';
-var GEO_CACHE  = 'geo_cache';
-var HASH_FIELD = 'json';
-var HASH_TTL   = 86400*10;
+const USER_CACHE = 'user_cache';
+const GEO_CACHE  = 'geo_cache';
+const HASH_FIELD = 'json';
+const HASH_TTL   = 86400*10;
 
-var GITHUB_REQUEST_INTERVAL_MIN   = 720; // (3600 * 1000 / 5000)
-var GITHUB_REQUEST_INTERVAL_MAX   = 5000;
-var GITHUB_MIN_API_REMAINING      = 100;
-var GITHUB_MIN_RATELIMIT_CHECK_MS = 5000;
+const GITHUB_REQUEST_INTERVAL_MIN   = 720; // (3600 * 1000 / 5000)
+const GITHUB_REQUEST_INTERVAL_MAX   = 5000;
+const GITHUB_MIN_API_REMAINING      = 100;
+const GITHUB_MIN_RATELIMIT_CHECK_MS = 5000;
 
 var maxEventId = 0;
 
-var stats = {
+const stats = {
   events: 0,
   eventsUnique: 0,
   eventsDropped: 0,
@@ -50,9 +50,11 @@ var stats = {
 };
 
 var github = new GitHub({
-  version: '3.0.0',
   protocol: 'https',
-  timeout: 5000
+  timeout: 5000,
+  headers: {
+    "user-agent": "hubstre.am"
+  }
 });
 
 github.authenticate({
@@ -163,22 +165,21 @@ var trimmedUserFields = [
 ];
 
 function getUserFromGithub(login, callback) {
-  github.user.getFrom({user: login}, function (err, user) {
-    if (user) {
+  github.users.getForUser({username: login}, function (err, user) {
+    if (user && user.data) {
       // trim user down to what we need, save space in redis
       var trimmedUser = {};
       for (var i = 0; i < trimmedUserFields.length; i++) {
-        trimmedUser[trimmedUserFields[i]] = user[trimmedUserFields[i]];
+        trimmedUser[trimmedUserFields[i]] = user.data[trimmedUserFields[i]];
       }
-
-      setRedis(USER_CACHE, user.id, trimmedUser, HASH_TTL);
+      setRedis(USER_CACHE, user.data.id, trimmedUser, HASH_TTL);
       callback(0, trimmedUser);
     } else if (err) {
-      var errStr = 'github.user.getFrom error: ' + err + ' for ' + login;
+      var errStr = 'github.user.getForUser error: ' + err + ' for ' + login;
       console.log(errStr);
       callback(errStr, null);
     } else {
-      var errStr = 'github.user.getFrom unknown state for ' + login;
+      var errStr = 'github.user.getForUser unknown state for ' + login;
       console.log(errStr);
       callback(errStr, null);
     }
@@ -267,18 +268,18 @@ function dispatchEvent(event) {
 var checkGithubLimit = function () {
   console.log(stats);
 
-  github.misc.rateLimit({}, function(err, limits) {
+  github.misc.getRateLimit({}, function(err, limits) {
     if (err) {
-      console.log('github.misc.rateLimit error: ' + err);
+      console.log('github.misc.getRateLimit error: ' + err);
       stats.githubRemaining = 0;
     } else {
-      if (limits.resources.core.remaining > GITHUB_MIN_API_REMAINING) {
-        stats.githubRemaining = limits.resources.core.remaining - GITHUB_MIN_API_REMAINING;
+      if (limits.data.resources.core.remaining > GITHUB_MIN_API_REMAINING) {
+        stats.githubRemaining = limits.data.resources.core.remaining - GITHUB_MIN_API_REMAINING;
       } else {
         console.log('github over limit: ' + JSON.stringify(limits));
         stats.githubRemaining = 0;
       }
-      var reset = limits.resources.core.reset*1000 - now();
+      var reset = limits.data.resources.core.reset*1000 - now();
       if (reset > 0) {
         stats.githubReset = reset;
       } else {
@@ -307,15 +308,15 @@ var getEvents = function () {
     return;
   }
 
-  github.events.get({}, function (err, events) {
+  github.activity.getEvents({}, function (err, events) {
     if (err) {
-      console.log('github.events.get error: ' + err);
+      console.log('github.activity.getEvents error: ' + err);
       setTimeout(getEvents, stats.eventsTimer);
       return;
     }
 
     // filter out duplicate events
-    var newEvents = events.filter(function (event) {
+    var newEvents = events.data.filter(function (event) {
       return (parseInt(event.id) > maxEventId);
     }).sort(function (a,b) {
       return parseInt(a.id) - parseInt(b.id);
@@ -325,17 +326,17 @@ var getEvents = function () {
     }
 
     // throttle events queries just enough to not miss any
-    if (events.length == newEvents.length) {
+    if (events.data.length == newEvents.length) {
       // we may have missed events, cut timer in half
       stats.eventsTimer = Math.max(Math.floor(stats.eventsTimer / 2), GITHUB_REQUEST_INTERVAL_MIN);
-    } else if ((events.length / newEvents.length) > 1.2) {
+    } else if ((events.data.length / newEvents.length) > 1.2) {
       // more than 5 dupes (30 / 25), bump timer up a bit
-      var dupes = events.length - newEvents.length;
-      var increase = 1 + dupes / events.length;
+      var dupes = events.data.length - newEvents.length;
+      var increase = 1 + dupes / events.data.length;
       stats.eventsTimer = Math.min(Math.floor(stats.eventsTimer * increase), GITHUB_REQUEST_INTERVAL_MAX);
     }
 
-    stats.events += events.length;
+    stats.events += events.data.length;
     stats.eventsUnique += newEvents.length;
 
     newEvents.forEach(function(event, i) {
