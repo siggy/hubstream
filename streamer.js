@@ -315,6 +315,12 @@ var getEvents = function () {
       return;
     }
 
+    if (events.data === null) {
+      console.log('github.activity.getEvents return null data: ' + events);
+      setTimeout(getEvents, stats.eventsTimer);
+      return;
+    }
+
     // filter out duplicate events
     var newEvents = events.data.filter(function (event) {
       return (parseInt(event.id) > maxEventId);
